@@ -1,23 +1,26 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { exec } from 'child_process';
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
-  try {
-    const localFile = request.nextUrl.searchParams.get('localFile');
-    const tempDir = path.join(process.cwd(), 'tmp');
-    await mkdir(tempDir, { recursive: true });
-    
-    let filepath = '';
-    const outpath = path.join(tempDir, `out-${Date.now()}.json`);
+  const tempDir = path.join(process.cwd(), 'tmp');
+  let uploadedFilepath = '';
+  let outpath = '';
 
-    if (localFile) {
-      filepath = localFile; // Use local file directly for testing
-    } else {
+  try {
+    await mkdir(tempDir, { recursive: true });
+
+    const localFile = request.nextUrl.searchParams.get('localFile');
+    outpath = path.join(tempDir, `out-${Date.now()}.json`);
+    let filepath = localFile || '';
+
+    if (!filepath) {
       const formData = await request.formData();
       const file = formData.get('file');
 
@@ -27,36 +30,27 @@ export async function POST(request) {
 
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
+      uploadedFilepath = path.join(tempDir, `upload-${Date.now()}.pdf`);
+      filepath = uploadedFilepath;
 
-      const filename = `upload-${Date.now()}.pdf`;
-      filepath = path.join(tempDir, filename);
-
-      await writeFile(filepath, buffer);
+      await writeFile(uploadedFilepath, buffer);
     }
 
-    // Run python script
     const pythonScript = path.join(process.cwd(), 'lib', 'python_scripts', 'extractor.py');
-    const { stdout, stderr } = await execAsync(`python "${pythonScript}" "${filepath}" "${outpath}"`);
 
-    if (stderr) {
-      console.warn('Python stderr:', stderr);
-    }
+    await execFileAsync('python', [pythonScript, filepath, outpath], {
+      maxBuffer: 1024 * 1024 * 20,
+    });
 
-    // Read the generated JSON file
-    const fs = require('fs');
-    const data = JSON.parse(fs.readFileSync(outpath, 'utf-8'));
-
-    // Cleanup
-    try {
-      fs.unlinkSync(filepath);
-      fs.unlinkSync(outpath);
-    } catch (e) {
-      console.error('Cleanup error:', e);
-    }
-
-    return NextResponse.json(data);
+    const payload = await readFile(outpath, 'utf-8');
+    return NextResponse.json(JSON.parse(payload));
   } catch (error) {
     console.error('Extraction error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  } finally {
+    await Promise.allSettled([
+      uploadedFilepath ? unlink(uploadedFilepath) : Promise.resolve(),
+      outpath ? unlink(outpath) : Promise.resolve(),
+    ]);
   }
 }
