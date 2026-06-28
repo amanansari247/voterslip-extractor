@@ -34,3 +34,27 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Deploy on Render
+
+This app also calls a Python extractor from the Next.js API route, so the Render service needs both Node and Python dependencies.
+
+Install these Python packages from `requirements.txt` during build:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+Recommended Render commands:
+
+```bash
+npm ci
+python -m pip install -r requirements.txt
+npm run build
+```
+
+```bash
+npm start
+```
+
+If you use the OCR helper in `lib/python_scripts/ocr_extractor.py`, the server also needs the Tesseract binary plus Punjabi/Hindi/English language data. The current `app/api/extract/route.js` path only requires the Python packages above.
