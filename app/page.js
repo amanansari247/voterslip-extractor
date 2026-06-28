@@ -1005,7 +1005,7 @@ function VoterSlipApp() {
                 <img src={card.image} alt={`Prepared voter slip ${index + 1}`} />
                 {customBooth && (
                   <div className="polling-footer">
-                    Polling: <strong>{customBooth}</strong>
+                    Polling Station: <strong>{customBooth}</strong>
                   </div>
                 )}
               </article>
